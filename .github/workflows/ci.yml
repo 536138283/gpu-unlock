@@ -19,7 +19,7 @@ jobs:
   inputs:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: cache
         uses: actions/cache@v4
         with:
@@ -36,7 +36,7 @@ jobs:
     needs: inputs
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sudo apt-get update -q && sudo apt-get install -qy zstd
       - uses: actions/cache/restore@v4
         with:
@@ -53,14 +53,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image:
-          - debian:12          # 6.1
-          - ubuntu:24.04       # 6.8
-          - debian:13          # 6.12
-          - fedora:latest
-          - archlinux:latest
+        include:
+          - image: debian:12   # 6.1
+            setup: apt-get update -q && apt-get install -qy --no-install-recommends ca-certificates git
+          - image: ubuntu:24.04  # 6.8
+            setup: apt-get update -q && apt-get install -qy --no-install-recommends ca-certificates git
+          - image: debian:13   # 6.12
+            setup: apt-get update -q && apt-get install -qy --no-install-recommends ca-certificates git
+          - image: fedora:latest
+            setup: dnf install -qy git
+          - image: archlinux:latest
+            setup: pacman -Syu --noconfirm --needed git
     steps:
-      - uses: actions/checkout@v4
+      # Without git the checkout is a GitHub archive, which leaves out
+      # everything .gitattributes marks export-ignore, .github included.
+      - run: ${{ matrix.setup }}
+      - uses: actions/checkout@v5
       - run: sh .github/ci/module.sh
 
   package:
@@ -79,10 +87,10 @@ jobs:
           - image: archlinux:latest
             setup: pacman -Syu --noconfirm --needed base-devel git zstd
     steps:
-      # git before the checkout, so make dist and makepkg can build HEAD;
-      # zstd before the cache restore, which needs it.
+      # git before the checkout, as above and so make dist and makepkg can
+      # build HEAD; zstd before the cache restore, which needs it.
       - run: ${{ matrix.setup }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/cache/restore@v4
         with:
           path: .inputs
